@@ -1,0 +1,51 @@
+:root {
+   color-scheme: dark;
+   font-family: system-ui, sans-serif;
+   background: #181818;
+   color: #eeeeee;
+}
+
+body {
+   margin: 0;
+}
+
+main {
+   max-width: 72rem;
+   margin: 0 auto;
+   padding: 1rem;
+}
+
+header {
+   display: flex;
+   align-items: baseline;
+   justify-content: space-between;
+}
+
+h1 {
+   font-size: 1.25rem;
+}
+
+.terminal {
+   box-sizing: border-box;
+   min-height: 24rem;
+   margin: 0;
+   padding: 0.75rem;
+   overflow: auto;
+
+   border: 1px solid #555555;
+   background: #000000;
+   color: #eeeeee;
+
+   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+   font-size: 1rem;
+   line-height: 1.25;
+
+   white-space: pre-wrap;
+   overflow-wrap: break-word;
+   outline: none;
+}
+
+.terminal:focus {
+   border-color: #aaaaaa;
+}
+

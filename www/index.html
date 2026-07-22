@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+   <meta charset="utf-8">
+   <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1">
+   <title>WebTTY</title>
+   <link rel="stylesheet" href="/terminal.css">
+</head>
+<body>
+   <main>
+      <header>
+         <h1>WebTTY</h1>
+         <p id="connection-status">Disconnected</p>
+      </header>
+
+      <!--
+         tabindex makes this otherwise passive element keyboard-focusable.
+         Later, the renderer will update this element from the screen model.
+      -->
+      <pre
+         id="terminal"
+         class="terminal"
+         tabindex="0"
+         aria-label="Terminal output"></pre>
+   </main>
+
+   <script type="module" src="/terminal.js"></script>
+</body>
+</html>
+
