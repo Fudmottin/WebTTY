@@ -1,14 +1,17 @@
 // src/main.cpp
 
+#include <boost/asio/executor_work_guard.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl/context.hpp>
 
+#include <exception>
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 #include "https_server.hpp"
 
@@ -52,6 +55,25 @@ Configuration parse_arguments(int argc, char* argv[]) {
    return configuration;
 }
 
+void run_server(webtty::HttpsServer& server, asio::io_context& io_context) {
+   auto work_guard = asio::make_work_guard(io_context);
+
+   // Unlike the old detached jthread, this jthread has meaningful ownership:
+   // it is joined automatically after the io_context is stopped.
+   std::jthread io_thread{[&io_context] { io_context.run(); }};
+
+   try {
+      server.run();
+   } catch (...) {
+      work_guard.reset();
+      io_context.stop();
+      throw;
+   }
+
+   work_guard.reset();
+   io_context.stop();
+}
+
 } // namespace
 
 int main(int argc, char* argv[]) try {
@@ -74,7 +96,7 @@ int main(int argc, char* argv[]) try {
    webtty::HttpsServer server{io_context, tls_context, endpoint,
                               configuration.document_root};
 
-   server.run();
+   run_server(server, io_context);
 } catch (const std::exception& exception) {
    std::cerr << "webtty: " << exception.what() << '\n';
    return 1;

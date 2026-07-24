@@ -9,6 +9,7 @@
 
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -173,8 +174,9 @@ void handle_connection(tcp::socket socket, ssl::context& tls_context,
          return;
       }
 
-      WebSocketSession session{std::move(stream)};
-      session.run(std::move(request));
+      auto session = std::make_shared<WebSocketSession>(std::move(stream));
+      session->run(std::move(request));
+
       return;
    }
 
