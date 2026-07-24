@@ -1,9 +1,28 @@
-const terminal = document.querySelector("#terminal");
+class TerminalView {
+   constructor(element) {
+      if (!(element instanceof HTMLElement)) {
+         throw new Error("Terminal element is missing");
+      }
+
+      this.element = element;
+   }
+
+   // Keep rendering behind this boundary so VT parsing can be added later
+   // without changing the WebSocket event handling.
+   write(text) {
+      this.element.textContent += text;
+      this.element.scrollTop = this.element.scrollHeight;
+   }
+
+   focus() {
+      this.element.focus();
+   }
+}
+
+const terminalElement = document.querySelector("#terminal");
 const connectionStatus = document.querySelector("#connection-status");
 
-if (!(terminal instanceof HTMLElement)) {
-   throw new Error("Terminal element is missing");
-}
+const terminalView = new TerminalView(terminalElement);
 
 if (!(connectionStatus instanceof HTMLElement)) {
    throw new Error("Connection-status element is missing");
@@ -16,7 +35,7 @@ const socket = new WebSocket(websocketUrl);
 
 socket.addEventListener("open", () => {
    connectionStatus.textContent = "Connected";
-   terminal.focus();
+   terminalView.focus();
 });
 
 socket.addEventListener("message", (event) => {
@@ -24,10 +43,9 @@ socket.addEventListener("message", (event) => {
       return;
    }
 
-   // For the echo test, append received text directly.
-   // The VT parser will replace this once terminal handling begins.
-   terminal.textContent += event.data;
-   terminal.scrollTop = terminal.scrollHeight;
+   // PTY output is still appended directly. A stateful VT parser will
+   // eventually replace this simple rendering step.
+   terminalView.write(event.data);
 });
 
 socket.addEventListener("close", () => {
@@ -38,7 +56,7 @@ socket.addEventListener("error", () => {
    connectionStatus.textContent = "Connection error";
 });
 
-terminal.addEventListener("keydown", (event) => {
+terminalElement.addEventListener("keydown", (event) => {
    if (socket.readyState !== WebSocket.OPEN) {
       return;
    }
