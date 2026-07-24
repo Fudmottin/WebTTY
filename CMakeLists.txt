@@ -18,6 +18,7 @@ add_executable(
    src/main.cpp
    src/https_server.cpp
    src/websocket_session.cpp
+   src/pty_session.cpp
 )
 
 target_compile_features(webtty PRIVATE cxx_std_20)
@@ -36,6 +37,18 @@ target_link_libraries(
       OpenSSL::Crypto
       Threads::Threads
 )
+
+# On Linux, forkpty() is provided by libutil.
+# macOS provides it through the system libraries.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+   find_library(UTIL_LIBRARY util REQUIRED)
+
+   target_link_libraries(
+      webtty
+      PRIVATE
+         "${UTIL_LIBRARY}"
+   )
+endif()
 
 target_compile_definitions(
    webtty

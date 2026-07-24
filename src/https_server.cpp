@@ -217,11 +217,9 @@ void HttpsServer::run() {
       tcp::socket socket{io_context_};
       acceptor.accept(socket);
 
-      std::jthread connection{[this, socket = std::move(socket)]() mutable {
+      std::thread{[this, socket = std::move(socket)]() mutable {
          handle_connection(std::move(socket), tls_context_, document_root_);
-      }};
-
-      connection.detach();
+      }}.detach();
    }
 }
 
