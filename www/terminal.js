@@ -306,6 +306,24 @@ terminalElement.addEventListener("keydown", (event) => {
    socket.send(encodedKey);
 });
 
+terminalElement.addEventListener("paste", (event) => {
+   if (socket.readyState !== WebSocket.OPEN) {
+      return;
+   }
+
+   const text = event.clipboardData?.getData("text/plain");
+
+   if (text === undefined || text.length === 0) {
+      return;
+   }
+
+   // The browser must not insert pasted text into the DOM. The terminal
+   // display is driven solely by bytes echoed back from the PTY.
+   event.preventDefault();
+
+   socket.send(text);
+});
+
 function encodeKey(event) {
    if (event.metaKey || event.ctrlKey || event.altKey) {
       return null;
