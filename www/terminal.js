@@ -1,3 +1,182 @@
+class TerminalScreen {
+   constructor() {
+      this.lines = [""];
+      this.row = 0;
+      this.column = 0;
+   }
+
+   write(character) {
+      const line = this.lines[this.row];
+      const paddingLength = Math.max(0, this.column - line.length);
+      const paddedLine = line + " ".repeat(paddingLength);
+
+      this.lines[this.row] =
+         paddedLine.slice(0, this.column) +
+         character +
+         paddedLine.slice(this.column + 1);
+
+      ++this.column;
+   }
+
+   carriageReturn() {
+      this.column = 0;
+   }
+
+   lineFeed() {
+      ++this.row;
+
+      if (this.row === this.lines.length) {
+         this.lines.push("");
+      }
+   }
+
+   backspace() {
+      if (this.column > 0) {
+         --this.column;
+      }
+   }
+
+   horizontalTab() {
+      const tabWidth = 8;
+      this.column += tabWidth - (this.column % tabWidth);
+   }
+
+   text() {
+      return this.lines.join("\n");
+   }
+}
+
+class VtParser {
+   constructor(screen) {
+      this.screen = screen;
+      this.state = "ground";
+   }
+
+   write(text) {
+      // Parser state survives WebSocket messages because escape sequences
+      // may be divided across transport boundaries.
+      for (const character of text) {
+         this.consume(character);
+      }
+   }
+
+   consume(character) {
+      switch (this.state) {
+      case "ground":
+         this.consumeGround(character);
+         break;
+
+      case "escape":
+         this.consumeEscape(character);
+         break;
+
+      case "csi":
+         this.consumeCsi(character);
+         break;
+
+      case "osc":
+         this.consumeOsc(character);
+         break;
+
+      case "osc-escape":
+         this.consumeOscEscape(character);
+         break;
+
+      default:
+         throw new Error(`Unknown VT parser state: ${this.state}`);
+      }
+   }
+
+   consumeGround(character) {
+      switch (character) {
+      case "\x1b":
+         this.state = "escape";
+         break;
+
+      case "\r":
+         this.screen.carriageReturn();
+         break;
+
+      case "\n":
+         this.screen.lineFeed();
+         break;
+
+      case "\b":
+         this.screen.backspace();
+         break;
+
+      case "\t":
+         this.screen.horizontalTab();
+         break;
+
+      default:
+         if (isPrintable(character)) {
+            this.screen.write(character);
+         }
+         break;
+      }
+   }
+
+   consumeEscape(character) {
+      switch (character) {
+      case "[":
+         this.state = "csi";
+         break;
+
+      case "]":
+         this.state = "osc";
+         break;
+
+      case "\x1b":
+         // A new ESC restarts escape-sequence recognition.
+         break;
+
+      default:
+         // Unsupported short escape sequences are consumed as a unit.
+         this.state = "ground";
+         break;
+      }
+   }
+
+   consumeCsi(character) {
+      if (character === "\x1b") {
+         this.state = "escape";
+         return;
+      }
+
+      if (isCsiFinalByte(character)) {
+         this.state = "ground";
+      }
+   }
+
+   consumeOsc(character) {
+      switch (character) {
+      case "\x07":
+         // OSC may be terminated by BEL.
+         this.state = "ground";
+         break;
+
+      case "\x1b":
+         // OSC may also end with the two-character ST sequence: ESC \.
+         this.state = "osc-escape";
+         break;
+
+      default:
+         break;
+      }
+   }
+
+   consumeOscEscape(character) {
+      if (character === "\\") {
+         this.state = "ground";
+         return;
+      }
+
+      // ESC not followed by '\' was part of the ignored OSC payload.
+      this.state = character === "\x1b" ? "osc-escape" : "osc";
+   }
+}
+
 class TerminalView {
    constructor(element) {
       if (!(element instanceof HTMLElement)) {
@@ -5,18 +184,41 @@ class TerminalView {
       }
 
       this.element = element;
+      this.screen = new TerminalScreen();
+      this.parser = new VtParser(this.screen);
    }
 
-   // Keep rendering behind this boundary so VT parsing can be added later
-   // without changing the WebSocket event handling.
    write(text) {
-      this.element.textContent += text;
+      this.parser.write(text);
+      this.render();
+   }
+
+   render() {
+      this.element.textContent = this.screen.text();
       this.element.scrollTop = this.element.scrollHeight;
    }
 
    focus() {
       this.element.focus();
    }
+}
+
+function isPrintable(character) {
+   const codePoint = character.codePointAt(0);
+
+   if (codePoint === undefined) {
+      return false;
+   }
+
+   return codePoint >= 0x20 && codePoint !== 0x7f;
+}
+
+function isCsiFinalByte(character) {
+   const codePoint = character.codePointAt(0);
+
+   return codePoint !== undefined &&
+      codePoint >= 0x40 &&
+      codePoint <= 0x7e;
 }
 
 const terminalElement = document.querySelector("#terminal");
@@ -43,8 +245,6 @@ socket.addEventListener("message", (event) => {
       return;
    }
 
-   // PTY output is still appended directly. A stateful VT parser will
-   // eventually replace this simple rendering step.
    terminalView.write(event.data);
 });
 
@@ -78,7 +278,7 @@ function encodeKey(event) {
 
    switch (event.key) {
    case "Enter":
-      return "\r\n";
+      return "\r";
 
    case "Backspace":
       return "\b";
