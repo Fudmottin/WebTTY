@@ -49,6 +49,10 @@ class TerminalScreen {
       }
    }
 
+   moveCursorBackward(count) {
+      this.column = Math.max(0, this.column - count);
+   }
+
    text() {
       return this.lines.join("\n");
    }
@@ -194,10 +198,19 @@ class VtParser {
 
    dispatchCsi(finalByte) {
       if (
-         finalByte === "K" && (this.csiParameters === "" ||
-            this.csiParameters === "0")
+         finalByte === "K" &&
+         (this.csiParameters === "" || this.csiParameters === "0")
       ) {
          this.screen.eraseToEndOfLine();
+         return;
+      }
+
+      if (finalByte === "D") {
+         const count = parseCsiCount(this.csiParameters);
+
+         if (count !== null) {
+            this.screen.moveCursorBackward(count);
+         }
       }
 
       // Unsupported CSI commands are intentionally consumed without effect.
@@ -254,6 +267,20 @@ function isCsiParameterByte(character) {
    return codePoint !== undefined &&
       codePoint >= 0x30 &&
       codePoint <= 0x3f;
+}
+
+function parseCsiCount(parameters) {
+   if (parameters === "") {
+      return 1;
+   }
+
+   if (!/^[0-9]+$/.test(parameters)) {
+      return null;
+   }
+
+   const count = Number.parseInt(parameters, 10);
+
+   return count === 0 ? 1 : count;
 }
 
 const terminalElement = document.querySelector("#terminal");
