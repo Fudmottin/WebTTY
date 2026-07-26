@@ -41,6 +41,14 @@ class TerminalScreen {
       this.column += tabWidth - (this.column % tabWidth);
    }
 
+   eraseToEndOfLine() {
+      const line = this.lines[this.row];
+
+      if (this.column < line.length) {
+         this.lines[this.row] = line.slice(0, this.column);
+      }
+   }
+
    text() {
       return this.lines.join("\n");
    }
@@ -50,6 +58,7 @@ class VtParser {
    constructor(screen) {
       this.screen = screen;
       this.state = "ground";
+      this.csiParameters = "";
    }
 
    write(text) {
@@ -120,6 +129,7 @@ class VtParser {
    consumeEscape(character) {
       switch (character) {
       case "[":
+         this.csiParameters = "";
          this.state = "csi";
          break;
 
@@ -144,7 +154,13 @@ class VtParser {
          return;
       }
 
+      if (isCsiParameterByte(character)) {
+         this.csiParameters += character;
+         return;
+      }
+
       if (isCsiFinalByte(character)) {
+         this.dispatchCsi(character);
          this.state = "ground";
       }
    }
@@ -174,6 +190,17 @@ class VtParser {
 
       // ESC not followed by '\' was part of the ignored OSC payload.
       this.state = character === "\x1b" ? "osc-escape" : "osc";
+   }
+
+   dispatchCsi(finalByte) {
+      if (
+         finalByte === "K" && (this.csiParameters === "" ||
+            this.csiParameters === "0")
+      ) {
+         this.screen.eraseToEndOfLine();
+      }
+
+      // Unsupported CSI commands are intentionally consumed without effect.
    }
 }
 
@@ -219,6 +246,14 @@ function isCsiFinalByte(character) {
    return codePoint !== undefined &&
       codePoint >= 0x40 &&
       codePoint <= 0x7e;
+}
+
+function isCsiParameterByte(character) {
+   const codePoint = character.codePointAt(0);
+
+   return codePoint !== undefined &&
+      codePoint >= 0x30 &&
+      codePoint <= 0x3f;
 }
 
 const terminalElement = document.querySelector("#terminal");
