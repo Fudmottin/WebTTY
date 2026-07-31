@@ -53,6 +53,10 @@ class TerminalScreen {
       this.column = Math.max(0, this.column - count);
    }
 
+   moveCursorForward(count) {
+      this.column += count;
+   }
+
    text() {
       return this.lines.join("\n");
    }
@@ -210,6 +214,14 @@ class VtParser {
 
          if (count !== null) {
             this.screen.moveCursorBackward(count);
+         }
+      }
+
+      if (finalByte === "C") {
+         const count = parseCsiCount(this.csiParameters);
+
+         if (count !== null) {
+            this.screen.moveCursorForward(count);
          }
       }
 
